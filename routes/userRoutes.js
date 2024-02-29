@@ -15,7 +15,9 @@ router.post(
     const { name, email, phone, password, protocol, host } = req.body;
     const user = await UsersModel.findOne({ email });
     if (user) {
-      return next(new AppError("Sorry, email address already exists.", 400));
+      return next(
+        new AppError(`An account with email ${email} already exists.`, 400)
+      );
     }
     const createUser = await UsersModel.create({
       name,
@@ -25,7 +27,7 @@ router.post(
     });
 
     const userData = await UsersModel.findOne({ _id: createUser._id }).select(
-      "-password -password_reset_token -password_reset_expires"
+      "-password -password_reset_token -password_reset_expires -email_verify_token"
     );
 
     const resetToken = await userData?.createEmailVerifyToken();
@@ -62,7 +64,9 @@ router.post(
     }
 
     // 2) If email exist and password is correct
-    const user = await UsersModel.findOne({ email });
+    const user = await UsersModel.findOne({ email }).select(
+      "-_id -password_reset_token -password_reset_expires -email_verify_token"
+    );
     const correct = await user?.correctPassword(password, user.password);
 
     // If user is not found or password is incorrect
