@@ -12,22 +12,47 @@ const sendMail = require("../utils/sendMail");
 router.post(
   "/signup",
   catchAsync(async (req, res, next) => {
-    console.log("here ", req.body);
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, protocol, host } = req.body;
+    const user = await UsersModel.findOne({ email });
+    if (user) {
+      return next(new AppError("Sorry, email address already exists.", 400));
+    }
     const createUser = await UsersModel.create({
       name,
       email,
       phone,
       password,
     });
+
+    const userData = await UsersModel.findOne({ _id: createUser._id }).select(
+      "-password -password_reset_token -password_reset_expires"
+    );
+
+    const resetToken = await userData?.createEmailVerifyToken();
+    await userData.save();
+    const resetLink = `${protocol}//${host}/auth/email-verify/${resetToken}`;
+
+    const mailData = {
+      to: userData.email,
+      name: userData.name,
+      subject: "Verify your email address",
+      title: "Verify Your Email Address",
+      resetLink: resetLink,
+      templateName: "emailVerify",
+    };
+    sendMail(mailData);
+
     res.status(200).json({
       status: "success",
+      data: {
+        user: userData,
+      },
     });
   })
 );
 
 router.post(
-  "/signin",
+  "/login",
   catchAsync(async (req, res, next) => {
     const { email, password } = req.body;
 
@@ -52,8 +77,9 @@ router.post(
       expires: new Date(
         Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
       ),
-      // secure: true,
-      // httpOnly: true,
+      secure: true,
+      httpOnly: true,
+      sameSite: "None",
     };
     if (process.env.NODE_ENV === "production") cookieOptions.secure = true;
     res.cookie("jwt", token, cookieOptions);
@@ -84,7 +110,6 @@ router.post(
     await user.save();
     const resetLink = `${protocol}//${host}/auth/reset-password/${resetToken}`;
 
-    // Write email function to send
     const mailData = {
       to: user.email,
       subject: "Reset Password",
@@ -123,6 +148,36 @@ router.post(
     user.password = req.body.password;
     user.password_reset_token = undefined;
     user.password_reset_expires = undefined;
+    await user.save();
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+
+    res.status(200).json({
+      status: "success",
+      token,
+    });
+  })
+);
+
+router.post(
+  "/emailVerify/:token",
+  catchAsync(async (req, res, next) => {
+    const resetToken = req.params.token;
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    const user = await UsersModel.findOne({
+      email_verify_token: hashedToken,
+    });
+
+    if (!user) {
+      return next(new AppError("Token is invalid", 400));
+    }
+
+    user.is_email_verified = true;
+    user.email_verify_token = undefined;
     await user.save();
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);

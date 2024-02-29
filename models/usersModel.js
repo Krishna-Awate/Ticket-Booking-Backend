@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema(
     },
     email: {
       type: String,
+      unique: true,
       require: [true, "Email address is required"],
     },
     phone: {
@@ -22,6 +23,13 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "user",
+    },
+    is_email_verified: {
+      type: Boolean,
+      default: false,
+    },
+    email_verify_token: {
+      type: String,
     },
     password_reset_token: { type: String },
     password_reset_expires: Date,
@@ -59,6 +67,16 @@ userSchema.methods.createPasswordResetToken = async function () {
     .digest("hex");
   this.password_reset_expires = Date.now() + 10 * 60 * 1000;
   return resetToken;
+};
+
+// Create verifiy email  token
+userSchema.methods.createEmailVerifyToken = async function () {
+  const emailVerifyToken = crypto.randomBytes(32).toString("hex");
+  this.email_verify_token = crypto
+    .createHash("sha256")
+    .update(emailVerifyToken)
+    .digest("hex");
+  return emailVerifyToken;
 };
 
 const User = mongoose.model("User", userSchema);
