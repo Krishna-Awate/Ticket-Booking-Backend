@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-console.log("server", process.env.SERVER);
 mongoose
   .connect(process.env.SERVER, {})
   .then(() => {
