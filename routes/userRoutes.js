@@ -65,7 +65,7 @@ router.post(
 
     // 2) If email exist and password is correct
     const user = await UsersModel.findOne({ email }).select(
-      "-_id -password_reset_token -password_reset_expires -email_verify_token"
+      "-password_reset_token -password_reset_expires -email_verify_token -role"
     );
     const correct = await user?.correctPassword(password, user.password);
 
@@ -174,7 +174,9 @@ router.post(
 
     const user = await UsersModel.findOne({
       email_verify_token: hashedToken,
-    });
+    }).select(
+      "-password -password_reset_token -password_reset_expires -email_verify_token -role"
+    );
 
     if (!user) {
       return next(new AppError("Token is invalid", 400));
@@ -189,6 +191,41 @@ router.post(
     res.status(200).json({
       status: "success",
       token,
+      data: { user },
+    });
+  })
+);
+
+router.post(
+  "/resend-verification-email",
+  catchAsync(async (req, res, next) => {
+    const { email, protocol, host } = req.body;
+    const user = await UsersModel.findOne({
+      email: email,
+    });
+
+    if (!user) {
+      return next(new AppError("User not found", 400));
+    }
+
+    const resetToken = await user?.createEmailVerifyToken();
+    await user.save();
+    const resetLink = `${protocol}//${host}/auth/email-verify/${resetToken}`;
+
+    const mailData = {
+      to: user.email,
+      name: user.name,
+      subject: "Verify your email address",
+      title: "Verify Your Email Address",
+      resetLink: resetLink,
+      templateName: "emailVerify",
+    };
+    sendMail(mailData);
+
+    res.status(200).json({
+      status: "success",
+      message:
+        "A verification link has been successfully sent to your email. Kindly verify your email address",
     });
   })
 );
