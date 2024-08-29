@@ -230,4 +230,20 @@ router.post(
   })
 );
 
+router.get(
+  "/",
+  auth,
+  catchAsync(async (req, res, next) => {
+    const { email } = req.body;
+    const user = await UsersModel.findById(req.user._id)
+      .select("_id role name email")
+      .lean();
+
+    res.status(200).json({
+      status: "success",
+      user: user,
+    });
+  })
+);
+
 module.exports = router;

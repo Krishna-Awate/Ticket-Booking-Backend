@@ -10,7 +10,6 @@ const auth = require("../middleware/auth");
 router.post(
   "/upload",
   catchAsync(async (req, res, next) => {
-    console.log("req.body", req.body);
     const data = await DataModel.insertMany(req.body);
     res.status(200).json({
       status: "success",
@@ -43,7 +42,6 @@ router.get(
 router.post(
   "/bazar",
   catchAsync(async (req, res, next) => {
-    console.log("req.body", req.body);
     const data = await BazarModel.create(req.body);
     res.status(200).json({
       status: "success",
