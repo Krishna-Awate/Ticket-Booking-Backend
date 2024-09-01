@@ -236,7 +236,7 @@ router.get(
   catchAsync(async (req, res, next) => {
     const { email } = req.body;
     const user = await UsersModel.findById(req.user._id)
-      .select("_id role name email")
+      .select("name email phone created_at _id role")
       .lean();
 
     res.status(200).json({
